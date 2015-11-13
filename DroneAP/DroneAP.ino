@@ -35,10 +35,6 @@
 
 #define MAX_SRV_CLIENTS 1
 
-/* Set these to your desired credentials. */
-const char *ssid = "WIFI_DRONE";
-const char *password = "cafebabe12";
-
 WiFiServer server(7770);
 WiFiClient serverClients[MAX_SRV_CLIENTS];
 
@@ -47,7 +43,10 @@ void setup() {
 	Serial.begin(57600);
 
 	/* You can remove the password parameter if you want the AP to be open. */
-	WiFi.softAP(ssid, password);
+  char ssid[80];
+  memset(ssid, 0, sizeof(ssid));
+  sprintf(ssid, "DRONE_%s", WiFi.softAPmacAddress().c_str());
+	WiFi.softAP(ssid);
 
 	IPAddress myIP = WiFi.softAPIP();
 	server.begin();
