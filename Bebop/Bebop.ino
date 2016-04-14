@@ -7,6 +7,7 @@ enum {
     STATE_AP_CONNECT,
     STATE_DISCOVERY,
     STATE_DISCOVERY_ACK,
+    STATE_DISCOVERY_ACK,
 };
 
 static WiFiClient mClient;
