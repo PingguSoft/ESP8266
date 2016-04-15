@@ -7,7 +7,7 @@ enum {
     STATE_AP_CONNECT,
     STATE_DISCOVERY,
     STATE_DISCOVERY_ACK,
-    STATE_DISCOVERY_ACK,
+//    STATE_DISCOVERY_ACK,
 };
 
 static WiFiClient mClient;
@@ -44,6 +44,7 @@ void WiFiEvent(WiFiEvent_t event) {
 void loop() {
     switch (mNextState) {
         case STATE_INIT:
+        {
             int n = WiFi.scanNetworks();
 
             if (n == 0) {
@@ -61,9 +62,11 @@ void loop() {
                     }
                 }
             }
-            break;
+        }
+        break;
 
         case STATE_DISCOVERY:
+        {
             Serial.printf("Connect to discovery socket !!!\n");
 
             if (!mClient.connect("192.168.42.1", 44444)) {
@@ -74,9 +77,11 @@ void loop() {
                 mClient.flush();
                 mNextState = 3;
             }
-            break;
+        }
+        break;
 
         case STATE_DISCOVERY_ACK:
+        {
             Serial.printf("Waiting response !!!\n");
 
             while (mClient.available()) {
@@ -88,7 +93,8 @@ void loop() {
                 }
                 //{ "status": 0, "c2d_port": 54321, "arstream_fragment_size": 65000, "arstream_fragment_maximum_number": 4, "arstream_max_ack_interval": -1, "c2d_update_port": 51, "c2d_user_port": 21 }
             }
-            break;
+        }
+        break;
     }
 
     delay(100);

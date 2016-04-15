@@ -28,7 +28,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* Create a WiFi access point and provide a web server on it. */
+/* Create a WiFi access point and provide a server for transparent wifi to serial bridge */
 
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h> 
@@ -88,7 +88,7 @@ void loop() {
     for(i = 0; i < MAX_SRV_CLIENTS; i++){
       if (serverClients[i] && serverClients[i].connected()){
         serverClients[i].write(sbuf, len);
-//        delay(1);
+        delay(1);
       }
     }
   }
