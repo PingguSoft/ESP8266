@@ -55,7 +55,7 @@ void Utils::printf(char *fmt, ... )
     va_start (args, fmt );
     vsnprintf(buf, 256, fmt, args);
     va_end (args);
-    Serial.print(buf);
+    //Serial.print(buf);
 }
 
 /*

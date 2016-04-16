@@ -53,9 +53,10 @@ public:
     bool config(void);
     void process(u8 *dataAck, int size);
 
-// datetime.datetime.now().date().isoformat()                ==> '2016-04-15'              V
-// datetime.datetime.now().time().isoformat()                ==> '18:55:34.756000'
-// datetime.datetime.now().time().strftime("T%H%M%S+0000")   ==> 'T185603+0000'            V
+    s8   getRoll(void)  { return mRoll;     }
+    s8   getPitch(void) { return mPitch;    }
+    s8   getYaw(void)   { return mYaw;      }
+    s8   getGaz(void)   { return mGaz;      }
 
 private:
     u8  mBuf[1024];
@@ -73,6 +74,8 @@ private:
     s8   mGaz;
 
     u8   mCfgIdx;
+
+    u8   mPCMDSeq;
 };
 
 #endif

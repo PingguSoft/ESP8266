@@ -52,6 +52,13 @@ void WiFiEvent(WiFiEvent_t event) {
 
 static u8 dataAck[1024];
 
+
+static u8 recVideo = 0;
+static s8 speed = 0;
+static s8 roll = 0;
+static s8 pitch = 0;
+static s8 yaw = 0;
+
 void loop() {
     int size;
 
@@ -133,13 +140,66 @@ void loop() {
         u8 ch = Serial.read();
         Serial.printf("***** : %c\n", ch);
 
-        if (ch == 'q')
-            mCmd.takePicture();
-        else if (ch == 'a')
-            mCmd.takeOff();
-        else if (ch == 'z')
-            mCmd.land();
-    }
+        switch (ch) {
+            case 'p' : mCmd.takePicture();                                  break;
+            case 'v' : recVideo = !recVideo;    mCmd.recordVideo(recVideo); break;
 
+            case 'a' : mCmd.takeOff();                                      break;
+            case 'z' : mCmd.land();                                         break;
+
+            case 's' :
+                speed += (speed < 90) ? 10 : 0;
+                Serial.printf("thr : %d\n", speed);
+                break;
+
+            case 'x' :
+                speed += (speed > -90) ? -10 : 0;
+                Serial.printf("thr : %d\n", speed);
+                break;
+
+            case 'i' :
+                pitch += (pitch < 90) ? 10 : 0;
+                Serial.printf("pitch : %d\n", pitch);
+                break;
+
+            case 'k' :
+                pitch += (pitch > -90) ? -10 : 0;
+                Serial.printf("pitch : %d\n", pitch);
+                break;
+
+            case 'j' :
+                roll += (roll > -90) ? -10 : 0;
+                Serial.printf("roll : %d\n", roll);
+                break;
+
+            case 'l' :
+                roll += (roll < 90) ? 10 : 0;
+                Serial.printf("roll : %d\n", roll);
+                break;
+
+            case 'u' :
+                yaw += (yaw > -90) ? -10 : 0;
+                Serial.printf("yaw : %d\n", yaw);
+                break;
+
+            case 'o' :
+                yaw += (yaw < 90) ? 10 : 0;
+                Serial.printf("yaw : %d\n", yaw);
+                break;
+
+            case ' ' :
+                yaw = 0;
+                roll = 0;
+                pitch = 0;
+                speed = 0;
+                Serial.printf("reset pos\n");
+                break;
+        }
+    }
+    u8 flag = 0;
+
+    if (roll != 0 || pitch != 0)
+        flag = 1;
+    mCmd.move(flag, roll, pitch, yaw, speed);
 }
 

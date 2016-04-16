@@ -86,7 +86,7 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
             return len;
 
         case FRAME_TYPE_DATA_WITH_ACK:
-            Utils::printf(">> ACK REQUIRED : %d %d\n", mFrameType, mFrameID);
+            Utils::printf(">> ACK REQUIRED : %d %d %d\n", mFrameType, mFrameID, mFrameSeqID);
             len = Bebop::buildCmd(dataAck, FRAME_TYPE_ACK, 0xFE, "B", mFrameSeqID);
             return len;
     }
@@ -101,17 +101,30 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
             cmdID = PACK_CMD(ba.get8(), ba.get8(), ba.get16());
             cmd   = GET_CMD(cmdID);
 
-            if (cmdID == PACK_CMD(0, 5, 7)) {
+            if (cmdID == PACK_CMD(PROJECT_COMMON, COMMON_CLASS_COMMONSTATE, 7)) {
                 Utils::printf(">> RSSI         : %5d\n", ba.get16());
-            } else if (cmdID == PACK_CMD(1, 4, 4)) {
-                Utils::printf(">> POS          : %s %s %s\n", Utils::dtoa(buf, ba.getdouble()), Utils::dtoa(buf, ba.getdouble()), Utils::dtoa(buf, ba.getdouble()));
-            } else if (cmdID == PACK_CMD(1, 4, 5)) {
-                Utils::printf(">> SPEED        : %s %s %s\n", Utils::ftoa(buf, ba.getfloat()), Utils::ftoa(buf, ba.getfloat()), Utils::ftoa(buf, ba.getfloat()));
-            } else if (cmdID == PACK_CMD(1, 4, 6)) {
-                Utils::printf(">> ANGLE        : %s %s %s\n", Utils::ftoa(buf, ba.getfloat()), Utils::ftoa(buf, ba.getfloat()), Utils::ftoa(buf, ba.getfloat()));
-            } else if (cmdID == PACK_CMD(1, 4, 8)) {
-                Utils::printf(">> ALT          : %s\n", Utils::dtoa(buf, ba.getdouble()));
-            } else if (cmdID == PACK_CMD(1, 25, 0)) {
+            } else if (GET_PRJ_CLS(cmdID) == PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_PILOTINGSTATE)) {
+                switch(cmd) {
+                    case 4:
+                        Utils::printf(">> POS          : %s %s %s\n", Utils::dtoa(buf, ba.getdouble()),
+                            Utils::dtoa(buf, ba.getdouble()), Utils::dtoa(buf, ba.getdouble()));
+                        break;
+
+                    case 5:
+                        Utils::printf(">> SPEED        : %s %s %s\n", Utils::ftoa(buf, ba.getfloat()),
+                            Utils::ftoa(buf, ba.getfloat()), Utils::ftoa(buf, ba.getfloat()));
+                        break;
+
+                    case 6:
+                        Utils::printf(">> ANGLE        : %s %s %s\n", Utils::ftoa(buf, ba.getfloat()),
+                            Utils::ftoa(buf, ba.getfloat()), Utils::ftoa(buf, ba.getfloat()));
+                        break;
+
+                    case 8:
+                        Utils::printf(">> ALT          : %s\n", Utils::dtoa(buf, ba.getdouble()));
+                        break;
+                }
+            } else if (cmdID == PACK_CMD(PROJECT_ARDRONE3, ARDRONE3_CLASS_CAMERASTATE, 0)) {
                 Utils::printf(">> CAM          : %d %d\n", ba.get8(), ba.get8());
             } else {
                 Utils::printf(">> UNKNOWN      : %08x\n", cmdID);
@@ -123,7 +136,7 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
             cmd   = GET_CMD(cmdID);
 
             switch(GET_PRJ_CLS(cmdID)) {
-                case PACK_PRJ_CLS(0, 3):
+                case PACK_PRJ_CLS(PROJECT_COMMON, COMMON_CLASS_SETTINGSSTATE):
                     if (cmd == 0) {
                         Utils::printf(">> All Settings - Done\n");
                     } else if (cmd == 2) {
@@ -143,7 +156,7 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
                     }
                     break;
 
-                case PACK_PRJ_CLS(0, 5):
+                case PACK_PRJ_CLS(PROJECT_COMMON, COMMON_CLASS_COMMONSTATE):
                     if (cmd == 1) {
                         Utils::printf(">> Battery      : %d\n", ba.get8());
                     } else if (cmd == 4) {
@@ -153,13 +166,13 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
                     }
                     break;
 
-                case PACK_PRJ_CLS(0, 10):
+                case PACK_PRJ_CLS(PROJECT_COMMON, COMMON_CLASS_WIFISETTINGSSTATE):
                     if (cmd == 0) {
                         Utils::printf(">> WiFi Outdoor : %d\n", ba.get8());
                     }
                     break;
 
-                case PACK_PRJ_CLS(0, 14):
+                case PACK_PRJ_CLS(PROJECT_COMMON, COMMON_CLASS_CALIBRATIONSTATE):
                     if (cmd == 0) {
                         Utils::printf(">> Mag Cal      : %d %d %d %d\n", ba.get8(), ba.get8(), ba.get8(), ba.get8());
                     } else if (cmd == 1) {
@@ -171,7 +184,7 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
                     }
                     break;
 
-                case PACK_PRJ_CLS(1, 4):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_PILOTINGSTATE):
                     if (cmd == 0) {
                         Utils::printf(">> FlatTrim Done:\n");
                     } else if (cmd == 1) {
@@ -189,7 +202,7 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
                     }
                     break;
 
-                case PACK_PRJ_CLS(1, 6):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_PILOTINGSETTINGSSTATE):
                     if (cmd == 0) {
                         Utils::printf(">> Max Alt      : %f %f %f\n", ba.getfloat(), ba.getfloat(), ba.getfloat());
                     } else if (cmd == 1) {
@@ -201,7 +214,7 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
                     }
                     break;
 
-                case PACK_PRJ_CLS(1, 8):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_MEDIARECORDSTATE):
                     if (cmd == 0) {
                         Utils::printf(">> Pictue State : %d %d\n", ba.get8(), ba.get8());
                     } else if (cmd == 1) {
@@ -212,11 +225,11 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
                     }
                     break;
 
-                case PACK_PRJ_CLS(1, 12):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_SPEEDSETTINGSSTATE):
                     Utils::printf(">> SPEED State  : %08x\n", cmdID);
                     break;
 
-                case PACK_PRJ_CLS(1, 16):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_SETTINGSSTATE):
                     if (cmd == 4) {
                         Utils::printf(">> Motor Flight : %d %d %d\n", ba.get16(), ba.get16(), ba.get32());
                     } else if (cmd == 5) {
@@ -226,20 +239,20 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
                     }
                     break;
 
-                case PACK_PRJ_CLS(1, 20):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_PICTURESETTINGSSTATE):
                     if (cmd == 5) {
                         Utils::printf(">> VideoRec Stat: %d %d\n", ba.get8(), ba.get8());
                     }
                     break;
 
-                case PACK_PRJ_CLS(1, 22):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_MEDIASTREAMINGSTATE):
                     if (cmd == 0) {
                         const char *states[] = {"enabled", "disabled", "error"};
                         Utils::printf(">> VideoStm Stat: %s\n", states[ba.get32()]);
                     }
                     break;
 
-                case PACK_PRJ_CLS(1, 24):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3, ARDRONE3_CLASS_GPSSETTINGSSTATE):
                     if (cmd == 0) {
                         Utils::printf(">> Home Changed : %f %f\n", ba.getdouble(), ba.getdouble());
                     } else if (cmd == 2) {
@@ -247,14 +260,14 @@ int Receiver::parseFrame(u8 *data, u32 size, u8 *dataAck)
                     }
                     break;
 
-                case PACK_PRJ_CLS(129, 3):
+                case PACK_PRJ_CLS(PROJECT_ARDRONE3DEBUG, 3):
                     if (cmd == 0) {
                         Utils::printf(">> GPS NumSat   : %d\n", ba.get8());
                     }
                     break;
 
                 default:
-                    if (GET_PRJ(cmdID) == 129) {
+                    if (GET_PRJ(cmdID) == PROJECT_ARDRONE3DEBUG) {
                         Utils::printf(">> DEBUG        : %08x\n", cmdID);
                     }
                     break;
