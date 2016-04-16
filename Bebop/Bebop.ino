@@ -1,18 +1,26 @@
 #include <Arduino.h>
 #include <stdarg.h>
 #include <ESP8266WiFi.h>
+#include "Commands.h"
+#include "Receiver.h"
 
 enum {
     STATE_INIT = 0,
     STATE_AP_CONNECT,
     STATE_DISCOVERY,
     STATE_DISCOVERY_ACK,
-//    STATE_DISCOVERY_ACK,
+    STATE_CONFIG,
+    STATE_WORK,
 };
+
+u8  Bebop::mSeqID[256];
+
+static char *HOST = "192.168.42.1";
 
 static WiFiClient mClient;
 static int mNextState = STATE_INIT;
-
+static Commands mCmd(HOST, 54321);
+static Receiver mRcv(43210);
 
 void setup() {
     Serial.begin(115200);
@@ -41,7 +49,12 @@ void WiFiEvent(WiFiEvent_t event) {
     }
 }
 
+
+static u8 dataAck[1024];
+
 void loop() {
+    int size;
+
     switch (mNextState) {
         case STATE_INIT:
         {
@@ -69,7 +82,7 @@ void loop() {
         {
             Serial.printf("Connect to discovery socket !!!\n");
 
-            if (!mClient.connect("192.168.42.1", 44444)) {
+            if (!mClient.connect(HOST, 44444)) {
                 Serial.printf("Connection Failed !!!\n");
             } else {
                 char *req = "{\"controller_type\":\"computer\", \"controller_name\":\"katarina\", \"d2c_port\":\"43210\"}";
@@ -89,14 +102,44 @@ void loop() {
                 int len = mClient.read(buf, 256);
                 if (len > 0) {
                     Serial.printf("%d %s\n", len, (char*)buf);
-                    mNextState = 4;
+                    mRcv.begin();
+                    mNextState = STATE_CONFIG;
                 }
                 //{ "status": 0, "c2d_port": 54321, "arstream_fragment_size": 65000, "arstream_fragment_maximum_number": 4, "arstream_max_ack_interval": -1, "c2d_update_port": 51, "c2d_user_port": 21 }
             }
         }
         break;
+
+        case STATE_CONFIG:
+        {
+            if (mCmd.config())
+                mNextState = STATE_WORK;
+            size = mRcv.process(dataAck);
+            if (size > 0)
+                mCmd.process(dataAck, size);
+        }
+        break;
+
+        case STATE_WORK:
+        {
+            size = mRcv.process(dataAck);
+            mCmd.process(dataAck, size);
+        }
+        break;
     }
 
-    delay(100);
+    size = Serial.available();
+    while(size--) {
+        u8 ch = Serial.read();
+        Serial.printf("***** : %c\n", ch);
+
+        if (ch == 'q')
+            mCmd.takePicture();
+        else if (ch == 'a')
+            mCmd.takeOff();
+        else if (ch == 'z')
+            mCmd.land();
+    }
+
 }
 

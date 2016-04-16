@@ -3,11 +3,11 @@
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
  (at your option) any later version.
- 
+
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details. 
+ GNU General Public License for more details.
  see <http://www.gnu.org/licenses/>
 */
 
@@ -15,122 +15,174 @@
 #include <stdarg.h>
 #include <string.h>
 #include "Commands.h"
+#include "Utils.h"
+#include "ByteArray.h"
 
-
-Commands::Commands()
+Commands::Commands(char *host, int port)
 {
-    memset(mSeqID, 0, sizeof(mSeqID));
+    mStrHost = host;
+    mPort    = port;
+    mCfgIdx  = 0;
 }
 
 Commands::~Commands()
 {
+    mUDP.stop();
 }
 
-
-//    0          1       2      3 4 5 6       7              8        9 10     11
-// frametype, frameid, seqid, payloadlen+7    payload...
-//                                            prj,           cls,     cmd,     args
-
-int Commands::buildCmd(u8 *buf, u8 prj, u8 cls, u16 cmd, char *fmt, ...)
+void Commands::sendto(u8 *data, int size)
 {
-    va_list valist;
-    u8      frameid = 10;
-    u8      seqid;
-    u8      vu8;
-    u16     vu16;
-    u32     vu32;
-    float   vf;
-    int     idx;
-    u32     size;
+    mUDP.beginPacket(mStrHost, mPort);
+    mUDP.write(data, size);
+    mUDP.endPacket();
 
-    if (prj == ARDRONE3 && cls == CLASS_STREAMING && cmd == STREAM_VIDEO) {
-        frameid = 11;   // ack req
-        seqid   = mSeqID[1]++;
-    } else {
-        frameid = 10;
-        seqid   = mSeqID[0]++;
-    }
-
-    buf[0]  = 2;
-    buf[1]  = frameid;
-    buf[2]  = seqid;
-    buf[7]  = prj;
-    buf[8]  = cls;
-    buf[9]  = (cmd & 0xff);
-    buf[10] = (cmd & 0xff00) >> 8;
-    idx     = 11;
-    size    = 0;
-
-    if (fmt) {
-        va_start(valist, fmt);
-
-        for (int i = 0; i < strlen(fmt); i++) {
-            switch (fmt[i]) {
-                case 'b':
-                case 'B':
-                    buf[idx++] = va_arg(valist, u8);
-                    size = 1;
-                    break;
-
-               case 'h':
-               case 'H':
-                    vu16 = va_arg(valist, u16);
-                    size = sizeof(s16);
-                    buf[idx]     = (vu16 & 0xff);
-                    buf[idx + 1] = (vu16 & 0xff00) >> 8;
-                    break;
-
-               case 'i':
-               case 'I':
-                    vu32 = va_arg(valist, u32);
-                    size = sizeof(s32);
-                    memcpy(&buf[idx], &vu32, size);
-                    break;
-
-               case 'f':
-                    vf   = va_arg(valist, float);
-                    size = sizeof(float);
-                    memcpy(&buf[idx], &vf, size);
-                    break;
-
-               default:
-                    size = 0;
-                    Serial.printf("ABNORMAL FORMAT !!!  : %c\n", fmt[i]);
-                    break;
-            }
-            idx += size;
-        }
-        va_end(valist);
-    }
-
-    size = idx + size;
-    memcpy(&buf[3], &size, sizeof(u32));
-
-    return size;
-}
-
-
-int Commands::buildCmd(u8 *buf, u8 prj, u8 cls, u16 cmd)
-{
-    return buildCmd(buf, prj, cls, cmd, NULL);
+    //Utils::dump(data, size);
+    //Serial.printf("-------------------------TX END -----------------------\n\n");
 }
 
 void Commands::move(u8 enRollPitch, s8 roll, s8 pitch, s8 yaw, s8 gaz)
 {
-    buildCmd(mBuf, ARDRONE3, CLASS_PILOTING, CMD_PCMD, "bbbbI", roll, pitch, yaw, gaz, 0);
+    mEnRollPitch = enRollPitch;
+    mRoll  = roll;
+    mPitch = pitch;
+    mYaw   = yaw;
+    mGaz   = gaz;
 }
 
 void Commands::enableVideoAutoRecording(u8 enable, u8 storage)
-{   
-    buildCmd(mBuf, ARDRONE3, CLASS_SETPICTURE, PIC_VIDEO_AUTORECORD, "BB", enable, storage);
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBHBB", ARDRONE3, CLASS_SETPICTURE, 5, enable, storage);
+    sendto(mBuf, size);
 }
 
 void Commands::takePicture(u8 storage)
-{   
-    buildCmd(mBuf, ARDRONE3, CLASS_MEDIARECORD, MEDIA_PICTURE, "B", storage);
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBHB", ARDRONE3, CLASS_MEDIARECORD, 0, storage);
+    sendto(mBuf, size);
 }
 
 void Commands::recordVideo(u8 enable, u8 storage)
-{   
-    buildCmd(mBuf, ARDRONE3, CLASS_MEDIARECORD, MEDIA_VIDEO, "BB", enable, storage);
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBHBB", ARDRONE3, CLASS_MEDIARECORD, 1, enable, storage);
+    sendto(mBuf, size);
 }
+
+void Commands::setDate(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBHS", ARDRONE3, CLASS_COMMON, 1, "2016-04-15");
+    sendto(mBuf, size);
+}
+
+void Commands::setTime(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBHS", ARDRONE3, CLASS_COMMON, 2, "T185603+0000");
+    sendto(mBuf, size);
+}
+
+void Commands::enableVideoStreaming(u8 enable)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 11, "BBHB", ARDRONE3, CLASS_STREAMING, 0, enable);
+    sendto(mBuf, size);
+}
+
+void Commands::moveCamera(s8 tilt, s8 pan)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBHBB", ARDRONE3, CLASS_CAMERA, 0, tilt, pan);
+    sendto(mBuf, size);
+}
+
+void Commands::takeOff(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBH", ARDRONE3, CLASS_PILOTING, 1);
+    sendto(mBuf, size);
+}
+
+void Commands::land(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBH", ARDRONE3, CLASS_PILOTING, 3);
+    sendto(mBuf, size);
+}
+void Commands::emergency(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBH", ARDRONE3, CLASS_PILOTING, 4);
+    sendto(mBuf, size);
+}
+void Commands::trim(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBH", ARDRONE3, CLASS_PILOTING, 0);
+    sendto(mBuf, size);
+}
+void Commands::requestSettings(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBH", ARDRONE3, CLASS_SETTING,  0);
+    sendto(mBuf, size);
+}
+void Commands::requestStates(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBH", ARDRONE3, CLASS_COMMON,   0);
+    sendto(mBuf, size);
+}
+void Commands::resetHome(void)
+{
+    PRINT_FUNC;
+    int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBH", ARDRONE3, CLASS_GPS,      1);
+    sendto(mBuf, size);
+}
+
+bool Commands::config(void)
+{
+    bool done = false;
+
+    switch (mCfgIdx) {
+        case 0: setDate();          break;
+        case 1: setTime();          break;
+        case 2: requestStates();    break;
+        case 3: requestSettings();  break;
+        case 4: moveCamera(0, 0);   break;
+        case 5: enableVideoAutoRecording(1); break;
+        case 6: enableVideoStreaming(1);
+            done = true;
+            break;
+    }
+    mCfgIdx++;
+
+    return done;
+}
+
+void Commands::process(u8 *dataAck, int size)
+{
+    long ts = millis();
+    int  diff = ts - mLastTS;
+
+    if (size > 0) {
+        sendto(dataAck, size);
+    }
+
+    // send PCMD every 25ms
+    if (diff >= 25) {
+        u8  flag = 0;
+
+        if (mEnRollPitch)
+            flag = 1;
+
+        //Serial.println("PCMD");
+        int size = Bebop::buildCmd(mBuf, FRAME_TYPE_DATA, 10, "BBHBbbbbI", ARDRONE3, CLASS_PILOTING, 2, flag, mRoll, mPitch, mYaw, mGaz, 0);
+        sendto(mBuf, size);
+
+        mLastTS = ts;
+    }
+}
+

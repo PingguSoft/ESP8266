@@ -11,68 +11,59 @@
  see <http://www.gnu.org/licenses/>
 */
 
-#ifndef _COMMANDS_H_
-#define _COMMANDS_H_
+#ifndef _RECEIVER_H_
+#define _RECEIVER_H_
 
 #include <WiFiUdp.h>
 #include "Common.h"
 #include "Bebop.h"
 
+#define HEADER_LEN  7
 
 // http://robotika.cz/robots/katarina/en#150202
 // https://github.com/robotika/katarina
 // https://github.com/Parrot-Developers/libARCommands/blob/master/Xml/ARDrone3_commands.xml
 
 
-//    0          1       2      3 4 5 6       7
-// frametype, frameid, seqid, payloadlen+7    payload
-
-class Commands
+class Receiver
 {
 public:
-    Commands(char *host, int port);
-    ~Commands();
-    void sendto(u8 *data, int size);
+    enum {
+        STATE_HEADER = 0,
+        STATE_BODY   = 1,
+    };
 
-    void takeOff(void);
-    void land(void);
-    void emergency(void);
-    void trim(void);
-    void requestSettings(void);
-    void requestStates(void);
-    void resetHome(void);
 
-    void move(u8 enRollPitch, s8 roll, s8 pitch, s8 yaw, s8 gaz);
-    void enableVideoAutoRecording(u8 enable, u8 storage = 0);
-    void takePicture(u8 storage = 0);
-    void recordVideo(u8 enable, u8 storage = 0);
-    void setDate(void);
-    void setTime(void);
-    void enableVideoStreaming(u8 enable);
-    void moveCamera(s8 tilt, s8 pan);
-    bool config(void);
-    void process(u8 *dataAck, int size);
+    Receiver(int port);
+    ~Receiver();
 
+    int recv(u8 *data, int size);
+    void begin(void);
+    int  process(u8 *dataAck);
 // datetime.datetime.now().date().isoformat()                ==> '2016-04-15'              V
 // datetime.datetime.now().time().isoformat()                ==> '18:55:34.756000'
 // datetime.datetime.now().time().strftime("T%H%M%S+0000")   ==> 'T185603+0000'            V
 
 private:
-    u8  mBuf[1024];
+    int parseFrame(u8 *data, u32 size, u8 *dataAck);
+
+
     WiFiUDP mUDP;
-    Bebop   mBebop;
 
-    char *mStrHost;
-    int  mPort;
-    long mLastTS;
+    u8  *mStrHost;
+    int mPort;
 
-    u8   mEnRollPitch;
-    s8   mRoll;
-    s8   mPitch;
-    s8   mYaw;
-    s8   mGaz;
+    u8  mHeader[10];
+    u8  mBody[1024];
+    u8  mNextState;
 
-    u8   mCfgIdx;
+    u8  mFrameType;
+    u8  mFrameID;
+    u8  mFrameSeqID;
+    u32 mPayloadLen;
+    u32 mBodyLen;
+
+    u16 mVidFrameNo;
 };
 
 #endif
